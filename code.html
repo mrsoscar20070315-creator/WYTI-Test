@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WYTI - 专业选择测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#faf5ff', 100: '#f3e8ff', 200: '#e9d5ff', 300: '#d8b4fe',
+                            400: '#c084fc', 500: '#a855f7', 600: '#9333ea', 700: '#7e22ce',
+                            800: '#6b21a8', 900: '#581c87',
+                        },
+                        secondary: {
+                            50: '#fdf4ff', 100: '#fae8ff', 200: '#f0abfc', 300: '#e879f9',
+                            400: '#d946ef', 500: '#c026d3', 600: '#a21caf', 700: '#86198f',
+                            800: '#701a75', 900: '#4a044e',
+                        }
+                    },
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+               body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .glass {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .progress-bar { transition: width 0.5s ease-in-out; }
+        .option-card {
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .option-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.15);
+        }
+        .option-card.selected {
+            border-color: #38bdf8;
+            background-color: rgba(56, 189, 248, 0.08);
+        }
+        .match-bar-bg { background: rgba(0,0,0,0.05); border-radius: 999px; height: 24px; overflow: hidden; }
+        .match-bar-fill {
+            height: 100%; border-radius: 999px;
+            background: linear-gradient(to right, #38bdf8, #7dd3fc);
+            transition: width 1.2s ease-out;
+        }
+        .cross-tag {
+            display: inline-block; padding: 4px 12px; border-radius: 999px;
+            font-size: 0.85rem; font-weight: 500;
+            background: linear-gradient(135deg, #38bdf8, #7dd3fc);
+            color: white; margin: 0 4px 4px 0;
+        }
+        .page { display: none; opacity: 0; }
+        .page.active { display: block; opacity: 1; animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .emoji-bounce { display: inline-block; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+        /* ==================== 二校门背景图 ==================== */
+        .bg-erschoolgate {
+            background-image: url('images/bg-erschoolgate.png');
+            background-size: cover;
+            background-position: center top;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
+        .bg-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(180deg,
+                rgba(250, 245, 255, 0.85) 0%,
+                rgba(255, 255, 255, 0.75) 40%,
+                rgba(243, 232, 255, 0.7) 100%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* ==================== 浮动装饰粒子（与二校门共存）==================== */
+        .floating-shapes {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            overflow: hidden; z-index: 0; pointer-events: none;
+        }
+        .shape {
+            position: absolute; border-radius: 50%; opacity: 0.06;
+            animation: float 20s infinite ease-in-out;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(15deg); }
+        }
+
+        /* ==================== 院徽展示样式（正方形 + 自适应大小）==================== */
+        .badge-img-single {
+            max-width: 120px; max-height: 120px;
+            width: auto; height: auto;
+            object-fit: contain;
+            border-radius: 12px;
+            filter: drop-shadow(0 4px 12px rgba(168, 85, 247, 0.2));
+            animation: badgePulse 2s infinite ease-in-out;
+        }
+        .badge-img-cross-left,
+        .badge-img-cross-right {
+            max-width: 80px; max-height: 80px;
+            width: auto; height: auto;
+            object-fit: contain;
+            border-radius: 10px;
+            filter: drop-shadow(0 4px 12px rgba(168, 85, 247, 0.2));
+            animation: badgePulse 2s infinite ease-in-out;
+        }
+        .badge-img-cross-left {
+            transform: rotate(-8deg);
+            margin-right: -10px;
+        }
+        .badge-img-cross-right {
+            transform: rotate(8deg);
+            margin-left: -10px;
+            animation-delay: 0.3s;
+        }
+        @keyframes badgePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        /* 院徽加载失败时的默认正方形徽标 */
+        .badge-fallback {
+            width: 80px; height: 80px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #a855f7, #c084fc);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+        }
+        .badge-fallback span {
+            color: white; font-size: 1.8rem; font-weight: 700;
+        }
+        .badge-fallback.square.large {
+            width: 100px; height: 100px;
+        }
+        .badge-fallback.square.large span {
+            font-size: 2.2rem;
+        }
+        .fb-single, .fb-cross {
+            display: flex; align-items: center; justify-content: center;
+        }
+        .fb-cross {
+            gap: 8px;
+        }
+
+        /* ==================== 院训展示样式 ==================== */
+        .motto-box {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(192, 132, 252, 0.08));
+            border-left: 4px solid #a855f7;
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
+            margin-top: 12px;
+            position: relative;
+        }
+        .motto-box::before {
+            content: '"';
+            position: absolute;
+            top: -5px; left: 8px;
+            font-size: 2.5rem; color: #a855f7;
+            opacity: 0.3; font-family: Georgia, serif;
+            line-height: 1;
+        }
+        .motto-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #581c87;
+            letter-spacing: 2px;
+            padding-left: 16px;
+        }
+        .motto-label {
+            font-size: 0.7rem;
+            color: #a855f7;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 4px;
+            padding-left: 16px;
+        }
+         
+        /* ==================== 书院吉祥物占位样式 ==================== */
+        .mascot-box {
+            width: 80px; height: 80px;
+            border-radius: 14px;
+            overflow: hidden;
+            position: relative;
+            background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .mascot-img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            border-radius: 14px;
+        }
+        .mascot-fallback {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            color: #38bdf8;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* 结果页装饰粒子 */
+        .result-deco {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.08;
+            animation: float 25s infinite ease-in-out;
+        }
+    </style>
+<base target="_blank">
+</head>
+
+<body class="bg-erschoolgate min-h-screen">
+    <!-- 白色+浅紫色半透明覆盖层 -->
+    <div class="bg-overlay"></div>
+
+    <!-- ==================== 浮动装饰粒子（与二校门背景共存）==================== -->
+    <div class="floating-shapes">
+        <div class="shape bg-primary-500" style="width: 300px; height: 300px; top: 5%; left: -5%; animation-delay: 0s;"></div>
+        <div class="shape bg-primary-400" style="width: 200px; height: 200px; top: 40%; right: -3%; animation-delay: -7s;"></div>
+        <div class="shape bg-secondary-400" style="width: 250px; height: 250px; bottom: 10%; left: 10%; animation-delay: -14s;"></div>
+        <div class="shape bg-primary-300" style="width: 150px; height: 150px; top: 70%; right: 15%; animation-delay: -3s;"></div>
+        <div class="shape bg-secondary-300" style="width: 180px; height: 180px; top: 20%; right: 30%; animation-delay: -10s;"></div>
+    </div>
+
+    <div id="app" class="container mx-auto px-4 py-8 max-w-4xl relative z-10">
+
+        <!-- ==================== 欢迎页面 ==================== -->
+        <div id="welcome-page" class="page active">
+            <div class="glass rounded-3xl p-8 md:p-12 shadow-xl">
+                <div class="text-center mb-8">
+                    <div class="mb-4">
+                        <div class="inline-block w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-400 flex items-center justify-center shadow-lg">
+                            <span class="text-white text-2xl font-bold">WY</span>
+                        </div>
+                    </div>
+                    <h1 class="text-4xl md:text-5xl font-bold text-primary-900 mb-4">WYTI 未央专业选择测试</h1>
+                    <p class="text-xl text-gray-600">发现最适合你的专业方向</p>
+                </div>
+
+                <div class="mb-8">
+                    <h2 class="text-2xl font-semibold text-primary-800 mb-4"><span class="emoji-bounce">🧭</span> 关于这个测试</h2>
+                    <p class="text-gray-600 mb-4">
+                        WYTI 未央专业选择测试旨在帮助你发现最适合自己性格特点和兴趣爱好的专业方向。
+                        通过回答 20 道选择题，我们将分析你在<strong>实践制造力</strong>、<strong>数字编程力</strong>、<strong>物理理论力</strong>、
+                        <strong>系统思维力</strong>、<strong>社会价值感</strong>五个维度的表现，为你推荐最匹配的专业领域。
+                    </p>
+                    <p class="text-gray-600">
+                        测试大约需要 3-5 分钟完成。测试结果仅供参考，不必过于较真。请放松作答，选择最符合你真实想法的选项。
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                    <div class="glass rounded-xl p-5 text-center">
+                        <div class="text-3xl mb-2">🔧</div>
+                        <h3 class="font-semibold text-primary-800 text-sm mb-1">实践制造力</h3>
+                        <p class="text-xs text-gray-600">动手能力与空间想象</p>
+                    </div>
+                    <div class="glass rounded-xl p-5 text-center">
+                        <div class="text-3xl mb-2">💻</div>
+                        <h3 class="font-semibold text-primary-800 text-sm mb-1">数字编程力</h3>
+                        <p class="text-xs text-gray-600">代码思维与数据分析</p>
+                    </div>
+                    <div class="glass rounded-xl p-5 text-center">
+                        <div class="text-3xl mb-2">⚛️</div>
+                        <h3 class="font-semibold text-primary-800 text-sm mb-1">物理理论力</h3>
+                        <p class="text-xs text-gray-600">原理推导与微观洞察</p>
+                    </div>
+                    <div class="glass rounded-xl p-5 text-center">
+                        <div class="text-3xl mb-2">🌐</div>
+                        <h3 class="font-semibold text-primary-800 text-sm mb-1">系统思维力</h3>
+                        <p class="text-xs text-gray-600">宏观视野与流程优化</p>
+                    </div>
+                    <div class="glass rounded-xl p-5 text-center col-span-2 md:col-span-1">
+                        <div class="text-3xl mb-2">🏛️</div>
+                        <h3 class="font-semibold text-primary-800 text-sm mb-1">社会价值感</h3>
+                        <p class="text-xs text-gray-600">家国情怀与使命担当</p>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button id="start-button" class="bg-gradient-to-r from-sky-500 to-sky-400 hover:from-sky-600 hover:to-sky-500 text-white font-semibold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">
+                        开始测试 <span class="emoji-bounce">🚀</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 问题页面 ==================== -->
+        <div id="question-page" class="page">
+            <div class="glass rounded-3xl p-8 md:p-12 shadow-xl">
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-600">问题 <span id="current-question">1</span> / <span id="total-questions">20</span></span>
+                        <span id="question-category" class="text-sm font-medium text-primary-700">能力倾向</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-gradient-to-r from-sky-500 to-sky-300 h-2.5 rounded-full progress-bar" style="width: 5%"></div>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <div id="question-image-wrapper" class="mb-4 hidden">
+                        <img id="question-image" src="" alt="问题配图" class="w-full max-w-md mx-auto rounded-xl shadow-md">
+                    </div>
+                    <h2 id="question-text" class="text-2xl font-semibold text-gray-800 mb-6">问题文本将显示在这里</h2>
+                    <div id="options-container" class="space-y-4"></div>
+                </div>
+
+                <div class="flex justify-between items-center">
+                    <button id="prev-button" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-6 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-arrow-left mr-2"></i>上一题
+                    </button>
+                    <div id="question-hint" class="text-sm text-gray-400 hidden md:block">选择最符合你第一反应的选项</div>
+                    <button id="next-button" class="bg-gradient-to-r from-sky-500 to-sky-400 hover:from-sky-600 hover:to-sky-500 text-white font-semibold py-2 px-6 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        下一题<i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 结果页面 ==================== -->
+        <div id="result-page" class="page">
+            <!-- 结果页装饰粒子 -->
+            <div class="result-deco bg-primary-500" style="width: 150px; height: 150px; top: 5%; right: -3%;"></div>
+            <div class="result-deco bg-secondary-400" style="width: 100px; height: 100px; bottom: 20%; left: -2%; animation-delay: -8s;"></div>
+
+            <div class="glass rounded-3xl p-8 md:p-12 shadow-xl relative">
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl md:text-4xl font-bold text-primary-900 mb-2">你的专业选择结果</h1>
+                    <p class="text-xl text-gray-600">基于你的回答，我们为你推荐以下方向</p>
+                </div>
+
+                                <!-- 结果主卡片（含院徽+院训） -->
+                <div class="mb-8">
+                    <div id="result-main-card" class="glass rounded-2xl p-6 mb-6">
+                        <div class="flex flex-col md:flex-row items-center gap-4">
+                            <!-- ==================== 院徽展示区（正方形 + 自适应大小）==================== -->
+                            <div class="mb-4 md:mb-0 flex-shrink-0">
+                                <div id="result-badge-img-wrapper" class="flex items-center justify-center">
+                                    <!-- test.js 动态填充：单一专业=正方形大图，交叉方向=两个旋转小图 -->
+                                    <div class="fb-single">
+                                        <div class="badge-fallback square large"><span>W</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-center md:text-left flex-1 min-w-0">
+                                <div id="result-badge" class="mb-2"></div>
+                                <h2 id="result-title" class="text-2xl font-bold text-primary-900 mb-2">最适合你的专业</h2>
+                                <div id="result-cross-depts" class="mb-2 hidden"></div>
+                                <p id="result-description" class="text-gray-600 mb-2">专业描述将显示在这里</p>
+
+                                <!-- ==================== 院训展示区（醒目位置）==================== -->
+                                <div id="result-motto" class="motto-box" style="display:none">
+                                    <div class="motto-label">院 训</div>
+                                    <div class="motto-text">自强不息，厚德载物</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== 五维定量分数条形图（0-100）==================== -->
+                    <h3 class="text-xl font-semibold text-primary-900 mb-4">🎚️ 你的五维能力分布</h3>
+                    <div id="dimensions-container" class="space-y-4 mb-8"></div>
+
+                    <!-- 五维雷达图（max=60） -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold text-primary-900 mb-4">📡 你的能力雷达图</h3>
+                        <div class="flex justify-center bg-white/50 rounded-2xl p-4">
+                            <canvas id="radarChart" width="360" height="360"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Top 专业匹配度 -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold text-primary-900 mb-4">🏆 专业匹配度排行</h3>
+                        <div id="top-matches-container" class="space-y-3"></div>
+                    </div>
+
+                    <!-- 优势与建议 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-xl font-semibold text-primary-900 mb-4">💪 你的优势维度</h3>
+                            <ul id="strengths-list" class="space-y-2 text-gray-700"></ul>
+                        </div>
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-xl font-semibold text-primary-900 mb-4">🌱 发展建议</h3>
+                            <ul id="suggestions-list" class="space-y-2 text-gray-700"></ul>
+                        </div>
+                    </div>
+
+                                        <!-- 补充建议（含吉祥物） -->
+                    <div id="supplementary-box" class="glass rounded-2xl p-6 mb-8 hidden">
+                        <div class="flex items-start gap-4">
+                            <div class="hidden md:block flex-shrink-0 pt-1">
+                                <div class="mascot-box">
+                                    <img id="mascot-img" src="images/mascot.png" alt="未小羊"
+                                         class="mascot-img"
+                                         onerror="this.style.display='none';this.parentElement.querySelector('.mascot-fallback').style.display='flex'">
+                                    <div class="mascot-fallback" style="display:none">
+                                        <span>小羊</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-xl font-semibold text-primary-900 mb-2">📌 未小羊给你的补充提升建议</h3>
+                                <p id="supplementary-text" class="text-gray-600"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 推荐卡片 -->
+                    <div class="glass rounded-2xl p-6 mb-8">
+                        <h3 class="text-xl font-semibold text-primary-900 mb-4">📋 你可能感兴趣的方向</h3>
+                        <div id="recommended-majors" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button id="restart-button" class="bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-semibold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">
+                        重新测试 <span class="emoji-bounce">🔄</span>
+                    </button>
+                    <button id="share-button" class="ml-4 bg-white hover:bg-gray-100 text-primary-700 font-semibold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105 border border-primary-200">
+                        <i class="fas fa-share-alt mr-2"></i>分享结果
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="test.js"></script>
+</body>
+</html>
