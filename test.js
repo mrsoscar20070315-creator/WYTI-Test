@@ -381,7 +381,7 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  window.showQuestion = function(index) {
+  function renderQuestion(index) {
     currentQuestionIndex = index;
     const q = shuffledQuestions[index];
     document.getElementById("current-question").textContent = index + 1;
@@ -403,6 +403,8 @@
       const card = document.createElement("div");
       card.className = "option-card glass rounded-xl p-4 cursor-pointer";
       card.dataset.index = i;
+      card.style.animationDelay = `${i * 40}ms`;
+      card.classList.add("pop-in");
       card.innerHTML = `
         <div class="flex items-start">
             <div class="w-8 h-8 rounded-full bg-gradient-to-r from-sky-500 to-sky-400 text-white flex items-center justify-center font-semibold mr-4 flex-shrink-0 text-sm">
@@ -422,6 +424,27 @@
     nextBtn.innerHTML = index === questions.length - 1
       ? "查看结果 <i class=\"fas fa-check ml-2\"></i>"
       : "下一题 <i class=\"fas fa-arrow-right ml-2\"></i>";
+  }
+
+  window.showQuestion = function(index) {
+    const stage = document.getElementById("question-content");
+    if (!stage || stage.classList.contains("leaving")) {
+      renderQuestion(index);
+      return;
+    }
+    stage.classList.remove("entered", "entering");
+    stage.classList.add("leaving");
+    setTimeout(() => {
+      renderQuestion(index);
+      stage.classList.remove("leaving");
+      stage.classList.add("entering");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          stage.classList.remove("entering");
+          stage.classList.add("entered");
+        });
+      });
+    }, 170);
   };
 
   function selectOption(optionIndex, scores) {
@@ -429,6 +452,9 @@
     const cards = container.querySelectorAll(".option-card");
     cards.forEach(c => c.classList.remove("selected"));
     cards[optionIndex].classList.add("selected");
+    cards[optionIndex].classList.remove("option-clicked");
+    cards[optionIndex].offsetWidth;
+    cards[optionIndex].classList.add("option-clicked");
     const prevIndex = userAnswers[currentQuestionIndex];
     if (prevIndex !== null && shuffledQuestions[currentQuestionIndex].options[prevIndex]) {
       const oldScores = shuffledQuestions[currentQuestionIndex].options[prevIndex].scores;
@@ -560,6 +586,44 @@
       supplementaryAdvice: dimGrowthMap[minDim],
       _debug: { X_norm, crossProb, shouldRecommendCross, relativeDiff, IC_boosted: X_norm > IC_X_THRESHOLD }
     };
+  }
+
+  function renderStoryEnding(result) {
+    const storyTitleEl = document.getElementById("story-title");
+    const storyDescEl = document.getElementById("story-description");
+    const storyTimelineEl = document.getElementById("story-timeline");
+    if (!storyTitleEl || !storyDescEl || !storyTimelineEl) return;
+
+    const dimOrder = ["M", "D", "P", "S", "V"];
+    const sortedDims = dimOrder
+      .map(key => ({ key, value: result.quantitativeScores[key] || 0 }))
+      .sort((a, b) => b.value - a.value);
+    const lead = sortedDims[0];
+    const support = sortedDims[1];
+    const leadName = DIMENSION_LABELS[lead.key].name;
+    const supportName = DIMENSION_LABELS[support.key].name;
+    const stageTitle = result.resultType === "cross"
+      ? `🎬 双线结局已解锁：${result.resultName}`
+      : `🎬 主线结局已解锁：${result.resultName}`;
+    const roleMap = {
+      M: "动手开荒型选手",
+      D: "代码推进型选手",
+      P: "原理洞察型选手",
+      S: "全局调度型选手",
+      V: "价值驱动型选手"
+    };
+
+    const timeline = [
+      `【序章】你以 ${leadName}（${lead.value}/100）开局，自带 ${roleMap[lead.key]} 气质。`,
+      `【转折】${supportName}（${support.value}/100）成为你的副技能，让你在复杂任务里更稳。`,
+      `【终章】你最终点亮「${result.resultName}」方向，下一步建议是：${result.resultGrowth}`
+    ];
+
+    storyTitleEl.textContent = stageTitle;
+    storyDescEl.textContent = `这不是唯一答案，但它很像你当前版本的“成长主线”。`;
+    storyTimelineEl.innerHTML = timeline
+      .map(item => `<div class="story-line-item">${item}</div>`)
+      .join("");
   }
 
   // ==================== showResult() — 含院徽+院训+定量分数 ====================
@@ -705,6 +769,8 @@
       `你的最低维度是【${DIMENSION_LABELS[result.minDim].name}】。${result.supplementaryAdvice}`;
     supBox.classList.remove("hidden");
 
+    renderStoryEnding(result);
+
     // 推荐专业卡片 Top 3
     const recContainer = document.getElementById("recommended-majors");
     recContainer.innerHTML = "";
@@ -754,6 +820,148 @@
     });
   }
 
+  function getShareCardSubtitle(result, topDims) {
+    if (result.resultType === "cross") {
+      return `双向适配：${result.matchedDepts.join(" × ")}`;
+    }
+    return `高能标签：${topDims.map(dim => DIMENSION_LABELS[dim.key].name).join(" + ")}`;
+  }
+
+  function drawMultilineText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+    let line = "";
+    const lines = [];
+    for (const char of text) {
+      const test = line + char;
+      if (ctx.measureText(test).width > maxWidth && line !== "") {
+        lines.push(line);
+        line = char;
+      } else {
+        line = test;
+      }
+      if (lines.length >= maxLines) break;
+    }
+    if (lines.length < maxLines && line) lines.push(line);
+    const rendered = lines.slice(0, maxLines);
+    rendered.forEach((item, idx) => {
+      ctx.fillText(item, x, y + idx * lineHeight);
+    });
+  }
+
+  function buildShareImageBlob(result) {
+    return new Promise((resolve, reject) => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1080;
+        canvas.height = 1350;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("无法创建画布上下文");
+
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        grad.addColorStop(0, "#e0f2fe");
+        grad.addColorStop(0.55, "#f3e8ff");
+        grad.addColorStop(1, "#fdf4ff");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "rgba(255,255,255,0.88)";
+        ctx.fillRect(80, 90, canvas.width - 160, canvas.height - 180);
+
+        const dimOrder = ["M", "D", "P", "S", "V"];
+        const topDims = dimOrder
+          .map(key => ({ key, value: result.quantitativeScores[key] || 0 }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 2);
+
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "bold 54px Inter, sans-serif";
+        ctx.fillText("WYTI 未央专业选择测试", 140, 220);
+        ctx.fillStyle = "#475569";
+        ctx.font = "32px Inter, sans-serif";
+        ctx.fillText("你的结局卡已生成", 140, 278);
+
+        ctx.fillStyle = "#8b5cf6";
+        ctx.font = "bold 64px Inter, sans-serif";
+        drawMultilineText(ctx, result.resultName, 140, 410, 760, 78, 2);
+
+        ctx.fillStyle = "#334155";
+        ctx.font = "30px Inter, sans-serif";
+        drawMultilineText(ctx, getShareCardSubtitle(result, topDims), 140, 520, 760, 44, 2);
+
+        ctx.fillStyle = "#0ea5e9";
+        ctx.font = "bold 34px Inter, sans-serif";
+        ctx.fillText("Top 能力标签", 140, 650);
+
+        topDims.forEach((dim, idx) => {
+          const y = 730 + idx * 100;
+          const info = DIMENSION_LABELS[dim.key];
+          ctx.fillStyle = "#1e293b";
+          ctx.font = "600 32px Inter, sans-serif";
+          ctx.fillText(`${info.icon} ${info.name}`, 140, y);
+          ctx.fillStyle = "#6366f1";
+          ctx.font = "bold 30px Inter, sans-serif";
+          ctx.fillText(`${dim.value}/100`, 760, y);
+        });
+
+        ctx.fillStyle = "#334155";
+        ctx.font = "28px Inter, sans-serif";
+        drawMultilineText(ctx, `剧情一句话：${result.resultDesc}`, 140, 980, 800, 42, 4);
+
+        ctx.fillStyle = "#64748b";
+        ctx.font = "24px Inter, sans-serif";
+        ctx.fillText("生成于 WYTI 专业测试", 140, 1210);
+
+        canvas.toBlob(blob => {
+          if (!blob) {
+            reject(new Error("生成图片失败"));
+            return;
+          }
+          resolve(blob);
+        }, "image/png");
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  window.generateShareImage = async function() {
+    if (!lastResultData) return;
+    const shareButton = document.getElementById("share-image-button");
+    if (shareButton) {
+      shareButton.disabled = true;
+      shareButton.innerHTML = "<i class=\"fas fa-spinner fa-spin mr-2\"></i>生成中...";
+    }
+    try {
+      const blob = await buildShareImageBlob(lastResultData);
+      const filename = `WYTI-${Date.now()}.png`;
+      const file = new File([blob], filename, { type: "image/png" });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: "WYTI 专业结局卡",
+          text: `我的结局是：${lastResultData.resultName}`,
+          files: [file]
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        alert("分享图已生成并下载到本地！");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("分享图生成失败，请稍后再试。");
+    } finally {
+      if (shareButton) {
+        shareButton.disabled = false;
+        shareButton.innerHTML = "<i class=\"fas fa-image mr-2\"></i>一键生成分享图";
+      }
+    }
+  };
+
   window.shareResults = function() {
     if (!lastResultData) return;
     const text = `我在WYTI专业选择测试中获得了推荐：${lastResultData.resultName}！快来看看你适合什么专业吧~`;
@@ -784,6 +992,7 @@
     document.getElementById("restart-button").addEventListener("click", () => {
       switchPage("result-page", "welcome-page"); window.resetTest();
     });
+    document.getElementById("share-image-button").addEventListener("click", window.generateShareImage);
     document.getElementById("share-button").addEventListener("click", window.shareResults);
   });
 
