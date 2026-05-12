@@ -470,7 +470,7 @@
                                 <div class="mascot-box">
                                     <img id="mascot-img" src="images/mascot.png" alt="未小羊"
                                          class="mascot-img"
-                                         onerror="this.style.display='none';this.parentElement.querySelector('.mascot-fallback').style.display='flex'">
+                                         onerror="if(!this.dataset.svgTried){this.dataset.svgTried='1';this.src='images/mascot.svg';}else{this.style.display='none';this.parentElement.querySelector('.mascot-fallback').style.display='flex';}">
                                     <div class="mascot-fallback" style="display:none">
                                         <span>小羊</span>
                                     </div>

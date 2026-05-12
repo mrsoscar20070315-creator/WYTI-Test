@@ -847,7 +847,63 @@
     });
   }
 
-  function buildShareImageBlob(result) {
+  function loadImageSafe(src) {
+    return new Promise(resolve => {
+      if (!src) {
+        resolve(null);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  }
+
+  function drawRoundedImage(ctx, img, x, y, size, radius) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + size - radius, y);
+    ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+    ctx.lineTo(x + size, y + size - radius);
+    ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+    ctx.lineTo(x + radius, y + size);
+    ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(img, x, y, size, size);
+    ctx.restore();
+  }
+
+  function drawBadgeFallback(ctx, label, x, y, size) {
+    const grad = ctx.createLinearGradient(x, y, x + size, y + size);
+    grad.addColorStop(0, "#7c3aed");
+    grad.addColorStop(1, "#38bdf8");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, size, size);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 58px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText((label || "W").charAt(0), x + size / 2, y + size / 2);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+
+  async function buildShareImageBlob(result) {
+    const mascotImage = await loadImageSafe("images/mascot.png") || await loadImageSafe("images/mascot.svg");
+    const primaryBadgePath = result.resultType === "cross"
+      ? ((crossBadgeMap[result.resultName] && crossBadgeMap[result.resultName][0]) || "")
+      : (badgeMap[result.resultName] || "");
+    const secondaryBadgePath = result.resultType === "cross"
+      ? ((crossBadgeMap[result.resultName] && crossBadgeMap[result.resultName][1]) || "")
+      : "";
+    const primaryBadgeImage = await loadImageSafe(primaryBadgePath) || await loadImageSafe("images/badges/default.svg");
+    const secondaryBadgeImage = await loadImageSafe(secondaryBadgePath) || await loadImageSafe("images/badges/default.svg");
+
     return new Promise((resolve, reject) => {
       try {
         const canvas = document.createElement("canvas");
@@ -883,6 +939,35 @@
         ctx.font = "bold 64px Inter, sans-serif";
         drawMultilineText(ctx, result.resultName, 140, 410, 760, 78, 2);
 
+        const badgeSize = 140;
+        const badgeX = 820;
+        const badgeY = 260;
+        if (result.resultType === "cross") {
+          ctx.save();
+          ctx.translate(badgeX + 20, badgeY + 10);
+          ctx.rotate(-0.08);
+          if (primaryBadgeImage) {
+            drawRoundedImage(ctx, primaryBadgeImage, -10, 0, badgeSize - 20, 18);
+          } else {
+            drawBadgeFallback(ctx, result.matchedDepts[0] || "交", -10, 0, badgeSize - 20);
+          }
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(badgeX + 90, badgeY + 40);
+          ctx.rotate(0.08);
+          if (secondaryBadgeImage) {
+            drawRoundedImage(ctx, secondaryBadgeImage, 0, 0, badgeSize - 20, 18);
+          } else {
+            drawBadgeFallback(ctx, result.matchedDepts[1] || "叉", 0, 0, badgeSize - 20);
+          }
+          ctx.restore();
+        } else if (primaryBadgeImage) {
+          drawRoundedImage(ctx, primaryBadgeImage, badgeX, badgeY, badgeSize, 20);
+        } else {
+          drawBadgeFallback(ctx, result.resultName || "W", badgeX, badgeY, badgeSize);
+        }
+
         ctx.fillStyle = "#334155";
         ctx.font = "30px Inter, sans-serif";
         drawMultilineText(ctx, getShareCardSubtitle(result, topDims), 140, 520, 760, 44, 2);
@@ -905,6 +990,26 @@
         ctx.fillStyle = "#334155";
         ctx.font = "28px Inter, sans-serif";
         drawMultilineText(ctx, `剧情一句话：${result.resultDesc}`, 140, 980, 800, 42, 4);
+
+        if (mascotImage) {
+          drawRoundedImage(ctx, mascotImage, 820, 1080, 140, 24);
+        } else {
+          const mx = 820;
+          const my = 1080;
+          const size = 140;
+          const mGrad = ctx.createLinearGradient(mx, my, mx + size, my + size);
+          mGrad.addColorStop(0, "#e0f2fe");
+          mGrad.addColorStop(1, "#bae6fd");
+          ctx.fillStyle = mGrad;
+          ctx.fillRect(mx, my, size, size);
+          ctx.fillStyle = "#0284c7";
+          ctx.font = "bold 28px Inter, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("未小羊", mx + size / 2, my + size / 2);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "alphabetic";
+        }
 
         ctx.fillStyle = "#64748b";
         ctx.font = "24px Inter, sans-serif";
