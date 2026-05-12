@@ -354,12 +354,24 @@
   const X_NORM_MAX = 10;
   const IC_X_THRESHOLD = 0.35;
   const IC_SCORE_BOOST = 0.015;
+  const RESULT_UPLOAD_CONFIG = {
+    enabled: false,
+    provider: "supabase", // "supabase" | "custom"
+    // Supabase 项目地址，例如: https://xxxx.supabase.co
+    supabaseUrl: "",
+    // Supabase anon public key（可放前端，建议配合 RLS 仅允许 insert）
+    supabaseAnonKey: "",
+    tableName: "wyti_results",
+    // custom 模式下直接 POST 到此地址
+    customEndpoint: ""
+  };
 
   let currentQuestionIndex = 0;
   let userAnswers = new Array(questions.length).fill(null);
   let userScores = { M: 0, D: 0, P: 0, S: 0, V: 0, X: 0 };
   let shuffledQuestions = [];
   let lastResultData = null;
+  let hasSavedCurrentResult = false;
 
   function shuffleArray(array) {
     const newArray = [...array];
@@ -373,6 +385,95 @@
   function getCrossKey(dept1, dept2) {
     const sorted = [dept1, dept2].sort();
     return sorted[0] + "-" + sorted[1];
+  }
+
+  function getVisitorId() {
+    const key = "wyt_test_visitor_id";
+    let id = "";
+    try {
+      id = localStorage.getItem(key) || "";
+      if (!id) {
+        id = "v_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem(key, id);
+      }
+    } catch (_) {
+      id = "v_" + Date.now().toString(36);
+    }
+    return id;
+  }
+
+  function buildResultPayload(result) {
+    return {
+      visitor_id: getVisitorId(),
+      test_version: "v1",
+      result_type: result.resultType,
+      result_name: result.resultName,
+      matched_departments: result.matchedDepts,
+      quantitative_scores: result.quantitativeScores,
+      normalized_scores: result.normalizedScores,
+      top_matches: result.topMatches,
+      answers: userAnswers,
+      question_order: shuffledQuestions.map(q => q.id),
+      user_scores_raw: userScores,
+      page_url: window.location.href,
+      user_agent: navigator.userAgent,
+      created_at_client: new Date().toISOString()
+    };
+  }
+
+  async function uploadResultToSupabase(payload) {
+    const base = (RESULT_UPLOAD_CONFIG.supabaseUrl || "").replace(/\/+$/, "");
+    const key = RESULT_UPLOAD_CONFIG.supabaseAnonKey || "";
+    const table = RESULT_UPLOAD_CONFIG.tableName || "wyti_results";
+    if (!base || !key) {
+      throw new Error("Supabase 配置不完整");
+    }
+    const res = await fetch(`${base}/rest/v1/${table}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": key,
+        "Authorization": `Bearer ${key}`,
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Supabase 上传失败: ${res.status} ${text}`);
+    }
+  }
+
+  async function uploadResultToCustomEndpoint(payload) {
+    const endpoint = RESULT_UPLOAD_CONFIG.customEndpoint || "";
+    if (!endpoint) {
+      throw new Error("customEndpoint 未配置");
+    }
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`自定义接口上传失败: ${res.status} ${text}`);
+    }
+  }
+
+  async function saveResultToDatabase(result) {
+    if (!RESULT_UPLOAD_CONFIG.enabled || hasSavedCurrentResult) return;
+    const payload = buildResultPayload(result);
+    try {
+      if (RESULT_UPLOAD_CONFIG.provider === "supabase") {
+        await uploadResultToSupabase(payload);
+      } else {
+        await uploadResultToCustomEndpoint(payload);
+      }
+      hasSavedCurrentResult = true;
+      console.log("[WYTI DB] result saved");
+    } catch (err) {
+      console.error("[WYTI DB] save failed", err);
+    }
   }
 
   function switchPage(fromId, toId) {
@@ -452,6 +553,7 @@
     userAnswers = new Array(questions.length).fill(null);
     userScores = { M: 0, D: 0, P: 0, S: 0, V: 0, X: 0 };
     lastResultData = null;
+    hasSavedCurrentResult = false;
     shuffledQuestions = shuffleArray(questions).map(q => ({ ...q, options: shuffleArray(q.options) }));
     document.getElementById("progress-bar").style.width = "5%";
     if (window.radarChartInstance) { window.radarChartInstance.destroy(); window.radarChartInstance = null; }
@@ -567,6 +669,7 @@
     const result = calculateResult();
     lastResultData = result;
     console.log("[WYTI Debug]", result._debug);
+    saveResultToDatabase(result);
 
     const badgeEl = document.getElementById("result-badge");
     const crossDeptsEl = document.getElementById("result-cross-depts");
