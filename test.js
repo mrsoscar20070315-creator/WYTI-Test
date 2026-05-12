@@ -357,12 +357,18 @@
   const RESULT_UPLOAD_CONFIG = {
     enabled: false,
     provider: "supabase", // "supabase" | "custom"
+<<<<<<< Updated upstream
     // Supabase 项目地址，例如: https://xxxx.supabase.co
     supabaseUrl: "",
     // Supabase anon public key（可放前端，建议配合 RLS 仅允许 insert）
     supabaseAnonKey: "",
     tableName: "wyti_results",
     // custom 模式下直接 POST 到此地址
+=======
+    supabaseUrl: "https://ftvwvfbufgccufceewnz.supabase.co",
+    supabaseAnonKey: "sb_publishable_8bT1wEYcrksiXmaK2gvO8A_11X8tyHn",
+    tableName: "WYTI-test",
+>>>>>>> Stashed changes
     customEndpoint: ""
   };
 
