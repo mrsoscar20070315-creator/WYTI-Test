@@ -369,6 +369,7 @@
   let shuffledQuestions = [];
   let lastResultData = null;
   let hasSavedCurrentResult = false;
+  const VISITOR_COMPLETED_KEY = "wyti_has_completed_test";
 
   function shuffleArray(array) {
     const newArray = [...array];
@@ -382,6 +383,15 @@
   function getCrossKey(dept1, dept2) {
     const sorted = [dept1, dept2].sort();
     return sorted[0] + "-" + sorted[1];
+  }
+
+  function hashStringToUnitInterval(input) {
+    let hash = 2166136261;
+    for (let i = 0; i < input.length; i++) {
+      hash ^= input.charCodeAt(i);
+      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return (hash >>> 0) / 4294967295;
   }
 
   function getVisitorId() {
@@ -462,9 +472,58 @@
         await uploadResultToCustomEndpoint(payload);
       }
       hasSavedCurrentResult = true;
+      try { localStorage.setItem(VISITOR_COMPLETED_KEY, "1"); } catch (_) {}
+      refreshVisitorCounter(true);
       console.log("[WYTI DB] result saved");
     } catch (err) {
       console.error("[WYTI DB] save failed", err);
+    }
+  }
+
+  function setVisitorCounterText(text) {
+    const counterEl = document.getElementById("visitor-counter-text");
+    if (counterEl) counterEl.textContent = text;
+  }
+
+  async function fetchUsageCountFromSupabase() {
+    const base = (RESULT_UPLOAD_CONFIG.supabaseUrl || "").replace(/\/+$/, "");
+    const key = RESULT_UPLOAD_CONFIG.supabaseAnonKey || "";
+    const table = RESULT_UPLOAD_CONFIG.tableName || "wyti_results";
+    if (!base || !key) return null;
+    const tablePath = encodeURIComponent(table);
+    const url = `${base}/rest/v1/${tablePath}?select=id&limit=1`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        "apikey": key,
+        "Authorization": `Bearer ${key}`,
+        "Prefer": "count=exact"
+      }
+    });
+    if (!res.ok) return null;
+    const contentRange = res.headers.get("content-range") || "";
+    const totalPart = contentRange.split("/")[1];
+    const total = Number(totalPart);
+    if (!Number.isFinite(total)) return null;
+    return total;
+  }
+
+  async function refreshVisitorCounter(afterSaved) {
+    if (!RESULT_UPLOAD_CONFIG.enabled || RESULT_UPLOAD_CONFIG.provider !== "supabase") {
+      setVisitorCounterText("您是正在探索此测试的未小羊");
+      return;
+    }
+    try {
+      const usageCount = await fetchUsageCountFromSupabase();
+      if (usageCount === null) {
+        setVisitorCounterText("您是正在探索此测试的未小羊");
+        return;
+      }
+      const hasCompleted = afterSaved || localStorage.getItem(VISITOR_COMPLETED_KEY) === "1";
+      const rank = hasCompleted ? usageCount : usageCount + 1;
+      setVisitorCounterText(`您是第 ${rank} 位使用此测试的未小羊`);
+    } catch (_) {
+      setVisitorCounterText("您是正在探索此测试的未小羊");
     }
   }
 
@@ -640,7 +699,19 @@
     let resultType, resultName, resultDesc, resultGrowth, matchedDepts = [];
     const crossKey = getCrossKey(top1.name, top2.name);
     const crossDir = crossDirections[crossKey];
-    const shouldRecommendCross = (Math.random() < crossProb) && crossDir;
+    const deterministicSeed = [
+      top1.name,
+      top2.name,
+      crossKey,
+      normalizedScores.M.toFixed(4),
+      normalizedScores.D.toFixed(4),
+      normalizedScores.P.toFixed(4),
+      normalizedScores.S.toFixed(4),
+      normalizedScores.V.toFixed(4),
+      X_norm.toFixed(4)
+    ].join("|");
+    const deterministicRoll = hashStringToUnitInterval(deterministicSeed);
+    const shouldRecommendCross = (deterministicRoll < crossProb) && crossDir;
 
     if (shouldRecommendCross) {
       resultType = "cross"; resultName = crossDir.name;
@@ -678,7 +749,14 @@
       normalizedScores, quantitativeScores,
       minDim, minScore,
       supplementaryAdvice: dimGrowthMap[minDim],
-      _debug: { X_norm, crossProb, shouldRecommendCross, relativeDiff, IC_boosted: X_norm > IC_X_THRESHOLD }
+      _debug: {
+        X_norm,
+        crossProb,
+        deterministicRoll,
+        shouldRecommendCross,
+        relativeDiff,
+        IC_boosted: X_norm > IC_X_THRESHOLD
+      }
     };
   }
 
@@ -861,7 +939,7 @@
     // 补充建议
     const supBox = document.getElementById("supplementary-box");
     document.getElementById("supplementary-text").textContent =
-      `你的最低维度是【${DIMENSION_LABELS[result.minDim].name}】。${result.supplementaryAdvice}`;
+      `维度【${DIMENSION_LABELS[result.minDim].name}】稍低于其他维度。${result.supplementaryAdvice}`;
     supBox.classList.remove("hidden");
 
     renderStoryEnding(result);
@@ -1177,6 +1255,7 @@
   // ==================== DOM 初始化 ====================
   document.addEventListener("DOMContentLoaded", function() {
     resetTest();
+    refreshVisitorCounter(false);
     document.getElementById("start-button").addEventListener("click", () => {
       switchPage("welcome-page", "question-page"); window.showQuestion(0);
     });
