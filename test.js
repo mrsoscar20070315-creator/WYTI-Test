@@ -368,7 +368,10 @@
   const SHARE_IMAGE_CONFIG = {
     qrEnabled: true,
     qrTargetUrl: "https://wyti.top",
-    qrApiBase: "https://api.qrserver.com/v1/create-qr-code"
+    qrApiBases: [
+      "https://api.qrserver.com/v1/create-qr-code",
+      "https://quickchart.io/qr"
+    ]
   };
 
   let currentQuestionIndex = 0;
@@ -1074,33 +1077,42 @@
 
   async function loadShareQrImage(targetUrl, size) {
     if (!SHARE_IMAGE_CONFIG.qrEnabled || !targetUrl) return null;
-    const apiBase = (SHARE_IMAGE_CONFIG.qrApiBase || "").replace(/\/+$/, "");
-    if (!apiBase) return null;
-    const qrUrl = `${apiBase}/?size=${size}x${size}&format=png&margin=2&data=${encodeURIComponent(targetUrl)}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-    try {
-      const res = await fetch(qrUrl, { signal: controller.signal });
-      if (!res.ok) return null;
-      const blob = await res.blob();
-      return await new Promise(resolve => {
-        const objectUrl = URL.createObjectURL(blob);
-        const img = new Image();
-        img.onload = () => {
-          URL.revokeObjectURL(objectUrl);
-          resolve(img);
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(objectUrl);
-          resolve(null);
-        };
-        img.src = objectUrl;
-      });
-    } catch (_) {
-      return null;
-    } finally {
-      clearTimeout(timeoutId);
+    const apiBases = Array.isArray(SHARE_IMAGE_CONFIG.qrApiBases)
+      ? SHARE_IMAGE_CONFIG.qrApiBases
+      : [];
+    for (const baseUrl of apiBases) {
+      const apiBase = (baseUrl || "").replace(/\/+$/, "");
+      if (!apiBase) continue;
+      const qrUrl = apiBase.includes("quickchart.io")
+        ? `${apiBase}?text=${encodeURIComponent(targetUrl)}&size=${size}&margin=2&format=png`
+        : `${apiBase}/?size=${size}x${size}&format=png&margin=2&data=${encodeURIComponent(targetUrl)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      try {
+        const res = await fetch(qrUrl, { signal: controller.signal });
+        if (!res.ok) continue;
+        const blob = await res.blob();
+        const img = await new Promise(resolve => {
+          const objectUrl = URL.createObjectURL(blob);
+          const image = new Image();
+          image.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(image);
+          };
+          image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(null);
+          };
+          image.src = objectUrl;
+        });
+        if (img) return img;
+      } catch (_) {
+        // try next provider
+      } finally {
+        clearTimeout(timeoutId);
+      }
     }
+    return null;
   }
 
   function drawRoundedImage(ctx, img, x, y, size, radius) {
@@ -1256,20 +1268,28 @@
           ctx.textBaseline = "alphabetic";
         }
 
+        const qrX = 140;
+        const qrY = 1030;
+        const qrSize = 220;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
         if (qrImage) {
-          const qrX = 140;
-          const qrY = 1030;
-          const qrSize = 220;
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
           ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
-          ctx.fillStyle = "#0f172a";
-          ctx.font = "600 28px Inter, sans-serif";
-          ctx.fillText("扫码查看测试", 390, 1110);
-          ctx.fillStyle = "#64748b";
-          ctx.font = "24px Inter, sans-serif";
-          ctx.fillText(shareLandingUrl.replace(/^https?:\/\//i, ""), 390, 1160);
+        } else {
+          ctx.fillStyle = "#e2e8f0";
+          ctx.fillRect(qrX, qrY, qrSize, qrSize);
+          ctx.fillStyle = "#475569";
+          ctx.font = "600 26px Inter, sans-serif";
+          ctx.fillText("二维码加载失败", qrX + 20, qrY + 110);
+          ctx.font = "22px Inter, sans-serif";
+          ctx.fillText("请直接访问域名", qrX + 30, qrY + 150);
         }
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "600 28px Inter, sans-serif";
+        ctx.fillText("扫码查看测试", 390, 1110);
+        ctx.fillStyle = "#64748b";
+        ctx.font = "24px Inter, sans-serif";
+        ctx.fillText(shareLandingUrl.replace(/^https?:\/\//i, ""), 390, 1160);
 
         ctx.fillStyle = "#64748b";
         ctx.font = "24px Inter, sans-serif";
