@@ -746,7 +746,7 @@
       X_norm.toFixed(4)
     ].join("|");
     const deterministicRoll = hashStringToUnitInterval(deterministicSeed);
-    const shouldRecommendCross = (deterministicRoll < crossProb) && crossDir;
+    const shouldRecommendCross = (deterministicRoll < crossProb) && Boolean(crossDir);
 
     if (shouldRecommendCross) {
       resultType = "cross"; resultName = crossDir.name;
@@ -1159,7 +1159,7 @@
     const primaryBadgeImage = await loadImageSafe(primaryBadgePath) || await loadImageSafe("images/badges/default.svg");
     const secondaryBadgeImage = await loadImageSafe(secondaryBadgePath) || await loadImageSafe("images/badges/default.svg");
     const shareLandingUrl = normalizeShareTargetUrl(SHARE_IMAGE_CONFIG.qrTargetUrl);
-    const qrImage = await loadShareQrImage(shareLandingUrl, 220);
+    const qrImage = await loadShareQrImage(shareLandingUrl, 160);
 
     return new Promise((resolve, reject) => {
       try {
@@ -1269,8 +1269,9 @@
         }
 
         const qrX = 140;
-        const qrY = 1030;
-        const qrSize = 220;
+        const qrY = 1080;
+        const qrSize = 160;
+        const qrTextX = 340;
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
         if (qrImage) {
@@ -1279,17 +1280,17 @@
           ctx.fillStyle = "#e2e8f0";
           ctx.fillRect(qrX, qrY, qrSize, qrSize);
           ctx.fillStyle = "#475569";
-          ctx.font = "600 26px Inter, sans-serif";
-          ctx.fillText("二维码加载失败", qrX + 20, qrY + 110);
-          ctx.font = "22px Inter, sans-serif";
-          ctx.fillText("请直接访问域名", qrX + 30, qrY + 150);
+          ctx.font = "600 20px Inter, sans-serif";
+          ctx.fillText("二维码加载失败", qrX + 10, qrY + 78);
+          ctx.font = "18px Inter, sans-serif";
+          ctx.fillText("请直接访问域名", qrX + 16, qrY + 108);
         }
         ctx.fillStyle = "#0f172a";
         ctx.font = "600 28px Inter, sans-serif";
-        ctx.fillText("扫码查看测试", 390, 1110);
+        ctx.fillText("扫码查看测试", qrTextX, 1135);
         ctx.fillStyle = "#64748b";
         ctx.font = "24px Inter, sans-serif";
-        ctx.fillText(shareLandingUrl.replace(/^https?:\/\//i, ""), 390, 1160);
+        ctx.fillText(shareLandingUrl.replace(/^https?:\/\//i, ""), qrTextX, 1185);
 
         ctx.fillStyle = "#64748b";
         ctx.font = "24px Inter, sans-serif";
