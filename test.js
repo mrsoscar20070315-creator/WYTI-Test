@@ -365,6 +365,11 @@
     countRpcName: "get_wyti_results_count",
     customEndpoint: ""
   };
+  const SHARE_IMAGE_CONFIG = {
+    qrEnabled: true,
+    qrTargetUrl: "https://wyti.top",
+    qrApiBase: "https://api.qrserver.com/v1/create-qr-code"
+  };
 
   let currentQuestionIndex = 0;
   let userAnswers = new Array(questions.length).fill(null);
@@ -1060,6 +1065,44 @@
     });
   }
 
+  function normalizeShareTargetUrl(url) {
+    const trimmed = (url || "").trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  }
+
+  async function loadShareQrImage(targetUrl, size) {
+    if (!SHARE_IMAGE_CONFIG.qrEnabled || !targetUrl) return null;
+    const apiBase = (SHARE_IMAGE_CONFIG.qrApiBase || "").replace(/\/+$/, "");
+    if (!apiBase) return null;
+    const qrUrl = `${apiBase}/?size=${size}x${size}&format=png&margin=2&data=${encodeURIComponent(targetUrl)}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    try {
+      const res = await fetch(qrUrl, { signal: controller.signal });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise(resolve => {
+        const objectUrl = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          resolve(img);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          resolve(null);
+        };
+        img.src = objectUrl;
+      });
+    } catch (_) {
+      return null;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   function drawRoundedImage(ctx, img, x, y, size, radius) {
     ctx.save();
     ctx.beginPath();
@@ -1103,6 +1146,8 @@
       : "";
     const primaryBadgeImage = await loadImageSafe(primaryBadgePath) || await loadImageSafe("images/badges/default.svg");
     const secondaryBadgeImage = await loadImageSafe(secondaryBadgePath) || await loadImageSafe("images/badges/default.svg");
+    const shareLandingUrl = normalizeShareTargetUrl(SHARE_IMAGE_CONFIG.qrTargetUrl);
+    const qrImage = await loadShareQrImage(shareLandingUrl, 220);
 
     return new Promise((resolve, reject) => {
       try {
@@ -1211,9 +1256,24 @@
           ctx.textBaseline = "alphabetic";
         }
 
+        if (qrImage) {
+          const qrX = 140;
+          const qrY = 1030;
+          const qrSize = 220;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
+          ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "600 28px Inter, sans-serif";
+          ctx.fillText("扫码查看测试", 390, 1110);
+          ctx.fillStyle = "#64748b";
+          ctx.font = "24px Inter, sans-serif";
+          ctx.fillText(shareLandingUrl.replace(/^https?:\/\//i, ""), 390, 1160);
+        }
+
         ctx.fillStyle = "#64748b";
         ctx.font = "24px Inter, sans-serif";
-        ctx.fillText("生成于 WYTI 专业测试", 140, 1210);
+        ctx.fillText("生成于 WYTI 专业测试", 140, 1290);
 
         canvas.toBlob(blob => {
           if (!blob) {
