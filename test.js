@@ -357,9 +357,16 @@
   const RESULT_UPLOAD_CONFIG = {
     enabled: true,
     provider: "supabase", // "supabase" | "custom"
+<<<<<<< Updated upstream
     supabaseUrl: "https://disboundary.top/WYTI-Test/",
     supabaseAnonKey: "sb_publishable_MlFz4AlxYIkmCAvCh4NImA_FzUw-K1E",
     tableName: "WYTI-test",
+=======
+    tableName: "wyti_results",
+    // 推荐开启：通过 Supabase RPC 返回聚合计数，避免开放明细 select
+    useCountRpc: true,
+    countRpcName: "get_wyti_results_count",
+>>>>>>> Stashed changes
     customEndpoint: ""
   };
 
@@ -491,6 +498,7 @@
     const table = RESULT_UPLOAD_CONFIG.tableName || "wyti_results";
     if (!base || !key) return null;
     const tablePath = encodeURIComponent(table);
+<<<<<<< Updated upstream
     const url = `${base}/rest/v1/${tablePath}?select=id&limit=1`;
     const res = await fetch(url, {
       method: "GET",
@@ -501,6 +509,42 @@
       }
     });
     if (!res.ok) return null;
+=======
+    const rpcName = RESULT_UPLOAD_CONFIG.countRpcName || "get_wyti_results_count";
+    const useCountRpc = RESULT_UPLOAD_CONFIG.useCountRpc !== false;
+    const url = useCountRpc
+      ? `${base}/rest/v1/rpc/${encodeURIComponent(rpcName)}`
+      : `${base}/rest/v1/${tablePath}?select=id&limit=1`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    let res;
+    try {
+      res = await fetch(url, {
+        method: useCountRpc ? "POST" : "GET",
+        headers: {
+          "apikey": key,
+          "Authorization": `Bearer ${key}`,
+          "Prefer": "count=exact",
+          "Content-Type": "application/json"
+        },
+        signal: controller.signal,
+        body: useCountRpc ? "{}" : undefined
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!res.ok) return null;
+
+    // RPC 模式：期待返回 [{"count":123}] 或 {"count":123}
+    if (useCountRpc) {
+      const data = await res.json().catch(() => null);
+      const rawCount = Array.isArray(data) ? data[0]?.count : data?.count;
+      const total = Number(rawCount);
+      return Number.isFinite(total) ? total : null;
+    }
+
+    // 旧模式：依赖 content-range 头
+>>>>>>> Stashed changes
     const contentRange = res.headers.get("content-range") || "";
     const totalPart = contentRange.split("/")[1];
     const total = Number(totalPart);
@@ -509,8 +553,13 @@
   }
 
   async function refreshVisitorCounter(afterSaved) {
+<<<<<<< Updated upstream
     if (!RESULT_UPLOAD_CONFIG.enabled || RESULT_UPLOAD_CONFIG.provider !== "supabase") {
       setVisitorCounterText("您是正在探索此测试的未小羊");
+=======
+    setVisitorCounterText("您是正在探索此测试的未小羊");
+    if (!RESULT_UPLOAD_CONFIG.enabled || RESULT_UPLOAD_CONFIG.provider !== "supabase") {
+>>>>>>> Stashed changes
       return;
     }
     try {
