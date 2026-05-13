@@ -1,104 +1,95 @@
 import random
-import hashlib
+import math
 
-# ==================== 原始数据（问题、权重、交叉表等） ====================
+# ==================== 原始数据（问题、权重、交叉表等）====================
 questions = [
-    # 题目格式：id, category, text, options (每项包含 text, scores)
     {"id":1, "options":[
-        {"scores":{"M":1.2}}, {"scores":{"D":0.8,"S":0.5}},
-        {"scores":{"P":1.2}}, {"scores":{"X":1}}
+        {"scores":{"M":2,"D":1}}, {"scores":{"D":2,"P":1}},
+        {"scores":{"P":2,"S":1}}, {"scores":{"V":2,"M":1}}
     ]},
     {"id":2, "options":[
-        {"scores":{"P":1.2}}, {"scores":{"D":1.2}},
-        {"scores":{"V":1.2}}, {"scores":{"X":1}}
+        {"scores":{"M":2,"D":1}}, {"scores":{"S":2,"P":1}},
+        {"scores":{"P":2,"D":1}}, {"scores":{"V":2,"S":1}}
     ]},
     {"id":3, "options":[
-        {"scores":{"S":1.2}}, {"scores":{"P":1.2,"X":-0.5}},
-        {"scores":{"D":1.2}}, {"scores":{"X":0.8}}
+        {"scores":{"M":2,"S":1}}, {"scores":{"D":2,"M":1}},
+        {"scores":{"P":2,"D":1}}, {"scores":{"V":2,"P":1}}
     ]},
     {"id":4, "options":[
-        {"scores":{"M":1,"S":0.8}}, {"scores":{"X":1}},
-        {"scores":{"P":1.2}}, {"scores":{"S":1.2,"V":0.3}}
+        {"scores":{"M":2,"P":1}}, {"scores":{"D":2,"S":1}},
+        {"scores":{"S":2,"V":1}}, {"scores":{"V":2,"M":1}}
     ]},
     {"id":5, "options":[
-        {"scores":{"D":1,"P":0.5}}, {"scores":{"M":1.2}},
-        {"scores":{"S":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"S":1}}, {"scores":{"D":2,"P":1}},
+        {"scores":{"S":2,"P":1}}, {"scores":{"V":2,"M":1}}
     ]},
     {"id":6, "options":[
-        {"scores":{"M":1.2}}, {"scores":{"P":1.2,"X":-0.5}},
-        {"scores":{"V":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"D":1}}, {"scores":{"D":2,"S":1}},
+        {"scores":{"P":2,"D":1}}, {"scores":{"V":2,"S":1}}
     ]},
     {"id":7, "options":[
-        {"scores":{"D":1.2,"P":0.5}}, {"scores":{"M":1.2}},
-        {"scores":{"S":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"P":1}}, {"scores":{"D":2,"P":1}},
+        {"scores":{"S":2,"P":1}}, {"scores":{"V":2,"S":1}}
     ]},
     {"id":8, "options":[
-        {"scores":{"P":0.8,"X":-0.5}}, {"scores":{"M":1,"S":0.5}},
-        {"scores":{"D":1,"S":0.8}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"D":1}}, {"scores":{"P":2,"D":1}},
+        {"scores":{"S":2,"V":1}}, {"scores":{"V":2,"M":1}}
     ]},
     {"id":9, "options":[
-        {"scores":{"P":1.2}}, {"scores":{"M":1.2}},
-        {"scores":{"V":1,"S":0.5}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"V":1}}, {"scores":{"D":2,"S":1}},
+        {"scores":{"V":2,"S":1}}, {"scores":{"S":2,"D":1}}
     ]},
     {"id":10, "options":[
-        {"scores":{"P":1.2}}, {"scores":{"M":1.2}},
-        {"scores":{"V":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"D":1}}, {"scores":{"P":2,"D":1}},
+        {"scores":{"V":2,"S":1}}, {"scores":{"S":2,"P":1}}
     ]},
     {"id":11, "options":[
-        {"scores":{"M":1,"V":0.8}}, {"scores":{"P":1,"D":0.5}},
-        {"scores":{"X":1}}, {"scores":{"S":1.2}}
+        {"scores":{"M":2,"D":1}}, {"scores":{"P":2,"S":1}},
+        {"scores":{"S":2,"V":1}}, {"scores":{"V":2,"P":1}}
     ]},
     {"id":12, "options":[
-        {"scores":{"D":1.2,"P":0.5}}, {"scores":{"M":1.2}},
-        {"scores":{"S":1.2}}, {"scores":{"V":1.2}}
+        {"scores":{"M":2,"S":1}}, {"scores":{"D":2,"S":1}},
+        {"scores":{"P":2,"D":1}}, {"scores":{"V":2,"S":1}}
     ]},
     {"id":13, "options":[
-        {"scores":{"D":1,"P":0.5}}, {"scores":{"M":1.2}},
-        {"scores":{"S":1.2}}, {"scores":{"X":1}}
+        {"scores":{"M":2,"P":1}}, {"scores":{"D":2,"P":1}},
+        {"scores":{"S":2,"P":1}}, {"scores":{"V":2,"D":1}}
     ]},
     {"id":14, "options":[
-        {"scores":{"P":1.2,"X":-0.5}}, {"scores":{"M":1.2}},
-        {"scores":{"V":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"D":1}}, {"scores":{"P":2,"D":1}},
+        {"scores":{"S":2,"D":1}}, {"scores":{"V":2,"S":1}}
     ]},
     {"id":15, "options":[
-        {"scores":{"P":1.2,"X":-0.5}}, {"scores":{"M":1.2}},
-        {"scores":{"S":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"S":1}}, {"scores":{"P":2,"D":1}},
+        {"scores":{"S":2,"P":1}}, {"scores":{"V":2,"P":1}}
     ]},
     {"id":16, "options":[
-        {"scores":{"D":1.2}}, {"scores":{"M":1.2}},
-        {"scores":{"S":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"D":1}}, {"scores":{"P":2,"D":1}},
+        {"scores":{"S":2,"P":1}}, {"scores":{"V":2,"S":1}}
     ]},
     {"id":17, "options":[
-        {"scores":{"P":1.2}}, {"scores":{"M":1.2}},
-        {"scores":{"S":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"S":1}}, {"scores":{"D":2,"P":1}},
+        {"scores":{"S":2,"P":1}}, {"scores":{"V":2,"M":1}}
     ]},
     {"id":18, "options":[
-        {"scores":{"D":1,"M":0.5}}, {"scores":{"V":1.2,"S":0.5}},
-        {"scores":{"X":1.2}}, {"scores":{"P":0.8,"X":-0.3}}
-    ]},
-    {"id":19, "options":[
-        {"scores":{"D":0.8,"S":0.8}}, {"scores":{"S":1.2}},
-        {"scores":{"X":1.2}}, {"scores":{"P":1}}
-    ]},
-    {"id":20, "options":[
-        {"scores":{"M":1.2}}, {"scores":{"P":1.2}},
-        {"scores":{"S":1.2}}, {"scores":{"X":1.2}}
+        {"scores":{"M":2,"P":1}}, {"scores":{"D":2,"P":1}},
+        {"scores":{"S":2,"P":1}}, {"scores":{"V":2,"S":1}}
     ]}
 ]
 
 departmentWeights = {
-    "能源与动力工程":     {"M":0.7,  "D":0.5,  "P":0.70, "S":0.70, "V":0.40},
-    "机械工程":           {"M":0.9,  "D":0.4,  "P":0.65, "S":0.50, "V":0.20},
-    "测控技术与仪器":     {"M":0.65, "D":0.60, "P":0.70, "S":0.50, "V":0.20},
-    "工业工程":           {"M":0.3,  "D":0.65, "P":0.40, "S":0.85, "V":0.20},
-    "电气工程及其自动化": {"M":0.5,  "D":0.55, "P":0.70, "S":0.70, "V":0.25},
-    "微电子科学与工程":   {"M":0.6,  "D":0.80, "P":0.80, "S":0.50, "V":0.30},
-    "工程物理":           {"M":0.3,  "D":0.75, "P":0.85, "S":0.55, "V":0.45},
-    "材料科学与工程":     {"M":0.9,  "D":0.3,  "P":0.75, "S":0.3,  "V":0.35},
-    "软件工程":           {"M":0.2,  "D":0.85, "P":0.3,  "S":0.55, "V":0.15},
-    "环境工程":           {"M":0.6,  "D":0.5,  "P":0.55, "S":0.75, "V":0.50},
-    "集成电路":           {"M":0.65, "D":0.65, "P":0.80, "S":0.50, "V":0.30}
-}
+    "能源与动力工程":     {"M": 6, "D": 5, "P": 7, "S": 7, "V": 8 },
+    "机械工程":           {"M": 9, "D": 4, "P": 4, "S": 3, "V": 2 },
+    "测控技术与仪器":     {"M": 6, "D": 7, "P": 6, "S": 4, "V": 2 },
+    "工业工程":           {"M": 4, "D": 6, "P": 3, "S": 9, "V": 3 },
+    "电气工程及其自动化": {"M": 4, "D": 7, "P": 7, "S": 7, "V": 5 },
+    "微电子科学与工程":   {"M": 5, "D": 8, "P": 8, "S": 4, "V": 4 },
+    "工程物理":           {"M": 3, "D": 7, "P": 9, "S": 5, "V": 7 },
+    "材料科学与工程":     {"M": 8, "D": 3, "P": 7, "S": 2, "V": 3 },
+    "软件工程":           {"M": 2, "D": 9, "P": 3, "S": 6, "V": 2 },
+    "环境工程":           {"M": 5, "D": 5, "P": 5, "S": 7, "V": 9 },
+    "集成电路":           {"M": 5, "D": 7, "P": 9, "S": 5, "V": 4 }
+  };
 
 crossDirections = {
     "机械工程-测控技术与仪器": "精密机械与智能装备",
@@ -111,7 +102,19 @@ crossDirections = {
     "工业工程-软件工程": "工业智能与数字化运营"
 }
 
-# 确定性哈希函数（复现原 test.js 的 hashStringToUnitInterval）
+# Constants matching test.js
+IC_P_THRESHOLD = 70
+IC_D_THRESHOLD = 55
+IC_X_THRESHOLD = 0.50
+IC_SCORE_BOOST = 0.04
+CROSS_PROB_BASE = 0.12
+CROSS_PROB_X_COEF = 0.15
+CROSS_PROB_D_COEF = 0.08
+CROSS_DIFF_THRESHOLD = 0.06
+CROSS_PROB_MIN = 0.10
+CROSS_PROB_MAX = 0.30
+
+# 确定性哈希函数（复现原 testpro.js 的 hashStringToUnitInterval）
 def hash_string_to_unit(s):
     h = 2166136261
     for ch in s:
@@ -129,72 +132,89 @@ def simulate_once():
     # 每题选项洗牌（与原引擎行为一致）
     shuffled_questions = []
     for q in questions:
-        opts = q["options"][:]  # shallow copy
+        opts = q["options"][:]
         random.shuffle(opts)
         shuffled_questions.append(opts)
 
-    scores = {"M":0,"D":0,"P":0,"S":0,"V":0,"X":0}
+    raw_scores = {"M":0,"D":0,"P":0,"S":0,"V":0}
     # 随机选答案
     for opts in shuffled_questions:
         choice = random.choice(opts)
         for k, v in choice["scores"].items():
-            scores[k] = scores.get(k,0) + v
+            raw_scores[k] = raw_scores.get(k, 0) + v
 
-    # 归一化
-    total = sum(scores[d] for d in ["M","D","P","S","V"])
-    norm = {d: max(0, scores[d]/total) if total>0 else 0 for d in ["M","D","P","S","V"]}
-    X_norm = max(0, min(1, (scores["X"] - (-4)) / (10 - (-4))))
+    dims = ["M", "D", "P", "S", "V"]
 
-    # V极端调整
-    V_norm = norm["V"]
-    vBoostHigh = max(0, (V_norm - 0.55) * 2.0) if V_norm > 0.55 else 0
-    vBoostLow  = max(0, (0.12 - V_norm) * 1.5) if V_norm < 0.12 else 0
+    # 归一化：用最大原始分作为100%基准（与 testpro.js 一致）
+    max_raw = max(raw_scores[d] for d in dims)
+    if max_raw <= 0:
+        max_raw = 1
+    scores = {d: round((raw_scores[d] / max_raw) * 100) for d in dims}
 
-    dept_matches = []
-    for dept, w in departmentWeights.items():
-        match = 0
-        for dim in ["M","D","P","S","V"]:
-            weight = w[dim]
-            if dim == "V":
-                if vBoostHigh > 0:
-                    if dept == "环境工程":
-                        weight = min(0.95, weight * (1 + vBoostHigh * 2.5))
-                    elif dept in ["电气工程及其自动化","微电子科学与工程","工程物理"]:
-                        weight = min(0.65, weight * (1 + vBoostHigh * 0.9))
-                if vBoostLow > 0:
-                    if dept in ["软件工程","机械工程","材料科学与工程"]:
-                        weight *= (1 + vBoostLow * 0.5)
-            match += norm[dim] * weight
-        dept_matches.append((dept, match))
+    # X维度 = 用户在 M/P 和 D/S 两对维度上的不偏程度
+    mp_diff = abs(scores["M"] - scores["P"])
+    ds_diff = abs(scores["D"] - scores["S"])
+    X_norm = max(0, min(1, 1 - (mp_diff + ds_diff) / 200))
 
-    # IC 加成
-    sorted_matches = sorted(dept_matches, key=lambda x: x[1], reverse=True)
-    ic_idx = next(i for i,(d,_) in enumerate(sorted_matches) if d=="集成电路")
-    if X_norm > 0.35 and ic_idx < 3:
-        for i,(d,sc) in enumerate(dept_matches):
-            if d == "集成电路":
-                dept_matches[i] = (d, sc+0.015)
+    # V_norm 用于V极端值调节
+    V_norm = scores["V"] / 100
+
+    # 专业匹配：加权余弦相似度
+    matches = []
+    for dept, prof in departmentWeights.items():
+        vec_score = [scores["M"], scores["D"], scores["P"], scores["S"], scores["V"]]
+        vec_prof = [prof["M"], prof["D"], prof["P"], prof["S"], prof["V"]]
+
+        dot = 0
+        norm_s = 0
+        norm_p = 0
+        for i in range(5):
+            w = 1
+            # V极端值调节
+            if i == 4:  # V维度
+                if V_norm > 0.55 and dept in ("环境工程", "能源与动力工程", "工程物理"):
+                    w = 1.25
+                elif V_norm < 0.25 and dept in ("软件工程", "机械工程"):
+                    w = 0.85
+            dot += vec_score[i] * vec_prof[i] * w
+            norm_s += vec_score[i] * vec_score[i]
+            norm_p += vec_prof[i] * vec_prof[i]
+
+        cosine = dot / (math.sqrt(norm_s) * math.sqrt(norm_p)) if norm_s > 0 and norm_p > 0 else 0
+        matches.append((dept, cosine))
+
+    # 集成电路特殊门槛
+    if scores["P"] >= IC_P_THRESHOLD and scores["D"] >= IC_D_THRESHOLD and X_norm >= IC_X_THRESHOLD:
+        for i, (dept, sc) in enumerate(matches):
+            if dept == "集成电路":
+                matches[i] = (dept, sc + IC_SCORE_BOOST)
                 break
-    sorted_matches = sorted(dept_matches, key=lambda x: x[1], reverse=True)
 
-    top1, top2 = sorted_matches[0], sorted_matches[1]
+    matches.sort(key=lambda x: x[1], reverse=True)
+
+    # 交叉方向判定
+    top1, top2 = matches[0], matches[1]
     diff = top1[1] - top2[1]
-    relativeDiff = diff / top1[1] if top1[1] > 0 else 1
-    diffFactor = max(0, 1 - relativeDiff / 0.08)
-    pCross = 0.05 + X_norm * 0.10 + diffFactor * 0.10
-    pCross = max(0.10, min(0.25, pCross))
+    rel_diff = diff / top1[1] if top1[1] > 0 else 1
+    diff_factor = max(0, 1 - rel_diff / CROSS_DIFF_THRESHOLD)
+    cross_prob = CROSS_PROB_BASE + X_norm * CROSS_PROB_X_COEF + diff_factor * CROSS_PROB_D_COEF
+    if X_norm < 0.3:
+        cross_prob *= 0.6
+    if X_norm > 0.6:
+        cross_prob = min(0.35, cross_prob * 1.3)
+    cross_prob = max(CROSS_PROB_MIN, min(CROSS_PROB_MAX, cross_prob))
 
-    # 交叉判定哈希种子
+    # 确定性哈希种子
     seed_str = "|".join([
         top1[0], top2[0],
         get_cross_key(top1[0], top2[0]),
-        f"{norm['M']:.4f}", f"{norm['D']:.4f}", f"{norm['P']:.4f}",
-        f"{norm['S']:.4f}", f"{norm['V']:.4f}",
+        f"{scores['M']:.4f}", f"{scores['D']:.4f}", f"{scores['P']:.4f}",
+        f"{scores['S']:.4f}", f"{scores['V']:.4f}",
         f"{X_norm:.4f}"
     ])
     roll = hash_string_to_unit(seed_str)
     cross_key = get_cross_key(top1[0], top2[0])
-    go_cross = (roll < pCross) and (cross_key in crossDirections)
+    go_cross = (roll < cross_prob) and (cross_key in crossDirections)
 
     if go_cross:
         return crossDirections[cross_key]
@@ -206,7 +226,7 @@ def monte_carlo(n=200000):
     counts = {}
     for _ in range(n):
         res = simulate_once()
-        counts[res] = counts.get(res,0) + 1
+        counts[res] = counts.get(res, 0) + 1
     print(f"总模拟次数: {n}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1]):
         print(f"{k:30s}: {v/n*100:.2f}%")
