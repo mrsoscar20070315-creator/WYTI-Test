@@ -359,7 +359,13 @@
     supabaseUrl: "https://ftvwvfbufgccufceewnz.supabase.co",
     supabaseAnonKey: "sb_publishable_8bT1wEYcrksiXmaK2gvO8A_11X8tyHn",
     provider: "supabase", // "supabase" | "custom"
+<<<<<<< Updated upstream
     tableName: "wyti_results",
+=======
+    supabaseUrl: "https://ftvwvfbufgccufceewnz.supabase.co",
+    supabaseAnonKey: "sb_publishable_8bT1wEYcrksiXmaK2gvO8A_11X8tyHn",
+    tableName: "wyti-results",
+>>>>>>> Stashed changes
     customEndpoint: ""
   };
 
@@ -468,6 +474,60 @@
     }
   }
 
+<<<<<<< Updated upstream
+=======
+  function setVisitorCounterText(text) {
+    const counterEl = document.getElementById("visitor-counter-text");
+    if (counterEl) counterEl.textContent = text;
+  }
+
+  async function fetchUsageCountFromSupabase() {
+    const base = (RESULT_UPLOAD_CONFIG.supabaseUrl || "").replace(/\/+$/, "");
+    const key = RESULT_UPLOAD_CONFIG.supabaseAnonKey || "";
+    const table = RESULT_UPLOAD_CONFIG.tableName || "wyti_results";
+    if (!base || !key) return null;
+    const tablePath = encodeURIComponent(table);
+    const url = `${base}/rest/v1/${tablePath}?select=id&limit=1`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        "apikey": key,
+        "Authorization": `Bearer ${key}`,
+        "Prefer": "count=exact"
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const contentRange = res.headers.get("content-range") || "";
+    const totalPart = contentRange.split("/")[1];
+    const total = Number(totalPart);
+    if (!Number.isFinite(total)) return null;
+    return total;
+  }
+
+  async function refreshVisitorCounter(afterSaved) {
+    setVisitorCounterText("您是正在探索此测试的未小羊");
+    if (!RESULT_UPLOAD_CONFIG.enabled || RESULT_UPLOAD_CONFIG.provider !== "supabase") {
+      return;
+    }
+    try {
+      const usageCount = await fetchUsageCountFromSupabase();
+      if (usageCount === null) {
+        setVisitorCounterText("您是正在探索此测试的未小羊");
+        return;
+      }
+      const hasCompleted = afterSaved || localStorage.getItem(VISITOR_COMPLETED_KEY) === "1";
+      const rank = hasCompleted ? usageCount : usageCount + 1;
+      setVisitorCounterText(`您是第 ${rank} 位使用此测试的未小羊`);
+    } catch (_) {
+      setVisitorCounterText("您是正在探索此测试的未小羊");
+    }
+  }
+
+>>>>>>> Stashed changes
   function switchPage(fromId, toId) {
     document.getElementById(fromId).classList.remove("active");
     document.getElementById(toId).classList.add("active");
