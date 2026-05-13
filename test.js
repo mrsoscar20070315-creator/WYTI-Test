@@ -1281,25 +1281,54 @@
 
   // ==================== DOM 初始化 ====================
   document.addEventListener("DOMContentLoaded", function() {
-    resetTest();
-    refreshVisitorCounter(false);
-    document.getElementById("start-button").addEventListener("click", () => {
-      switchPage("welcome-page", "question-page"); window.showQuestion(0);
-    });
-    document.getElementById("prev-button").addEventListener("click", window.showPreviousQuestion);
-    document.getElementById("next-button").addEventListener("click", () => {
-      if (userAnswers[currentQuestionIndex] === null) {
-        const container = document.getElementById("options-container");
-        container.style.animation = "none"; container.offsetHeight;
-        container.style.animation = "shake 0.4s ease-in-out"; return;
+    try {
+      resetTest();
+      const startBtn = document.getElementById("start-button");
+      const prevBtn = document.getElementById("prev-button");
+      const nextBtn = document.getElementById("next-button");
+      const restartBtn = document.getElementById("restart-button");
+      const shareImageBtn = document.getElementById("share-image-button");
+      const shareBtn = document.getElementById("share-button");
+
+      if (startBtn) {
+        startBtn.addEventListener("click", () => {
+          switchPage("welcome-page", "question-page");
+          window.showQuestion(0);
+        });
       }
-      if (window.showNextQuestion()) { switchPage("question-page", "result-page"); window.showResult(); }
-    });
-    document.getElementById("restart-button").addEventListener("click", () => {
-      switchPage("result-page", "welcome-page"); window.resetTest();
-    });
-    document.getElementById("share-image-button").addEventListener("click", window.generateShareImage);
-    document.getElementById("share-button").addEventListener("click", window.shareResults);
+      if (prevBtn) prevBtn.addEventListener("click", window.showPreviousQuestion);
+      if (nextBtn) {
+        nextBtn.addEventListener("click", () => {
+          if (userAnswers[currentQuestionIndex] === null) {
+            const container = document.getElementById("options-container");
+            if (container) {
+              container.style.animation = "none";
+              container.offsetHeight;
+              container.style.animation = "shake 0.4s ease-in-out";
+            }
+            return;
+          }
+          if (window.showNextQuestion()) {
+            switchPage("question-page", "result-page");
+            window.showResult();
+          }
+        });
+      }
+      if (restartBtn) {
+        restartBtn.addEventListener("click", () => {
+          switchPage("result-page", "welcome-page");
+          window.resetTest();
+        });
+      }
+      if (shareImageBtn) shareImageBtn.addEventListener("click", window.generateShareImage);
+      if (shareBtn) shareBtn.addEventListener("click", window.shareResults);
+
+      Promise.resolve(refreshVisitorCounter(false)).catch(() => {
+        setVisitorCounterText("您是正在探索此测试的未小羊");
+      });
+    } catch (err) {
+      console.error("[WYTI Init] 初始化失败", err);
+    }
   });
 
   const shakeStyle = document.createElement("style");
