@@ -359,13 +359,10 @@
     supabaseUrl: "https://ftvwvfbufgccufceewnz.supabase.co",
     supabaseAnonKey: "sb_publishable_8bT1wEYcrksiXmaK2gvO8A_11X8tyHn",
     provider: "supabase", // "supabase" | "custom"
-<<<<<<< Updated upstream
     tableName: "wyti_results",
-=======
-    supabaseUrl: "https://ftvwvfbufgccufceewnz.supabase.co",
-    supabaseAnonKey: "sb_publishable_8bT1wEYcrksiXmaK2gvO8A_11X8tyHn",
-    tableName: "wyti-results",
->>>>>>> Stashed changes
+    // 推荐开启：通过 Supabase RPC 返回聚合计数，避免开放明细 select
+    useCountRpc: true,
+    countRpcName: "get_wyti_results_count",
     customEndpoint: ""
   };
 
@@ -497,69 +494,40 @@
     const table = RESULT_UPLOAD_CONFIG.tableName || "wyti_results";
     if (!base || !key) return null;
     const tablePath = encodeURIComponent(table);
-    const url = `${base}/rest/v1/${tablePath}?select=id&limit=1`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        "apikey": key,
-        "Authorization": `Bearer ${key}`,
-        "Prefer": "count=exact"
-      }
-    });
-    if (!res.ok) return null;
-    const contentRange = res.headers.get("content-range") || "";
-    const totalPart = contentRange.split("/")[1];
-    const total = Number(totalPart);
-    if (!Number.isFinite(total)) return null;
-    return total;
-  }
-
-  async function refreshVisitorCounter(afterSaved) {
-    if (!RESULT_UPLOAD_CONFIG.enabled || RESULT_UPLOAD_CONFIG.provider !== "supabase") {
-      setVisitorCounterText("您是正在探索此测试的未小羊");
-      return;
-    }
-    try {
-      const usageCount = await fetchUsageCountFromSupabase();
-      if (usageCount === null) {
-        setVisitorCounterText("您是正在探索此测试的未小羊");
-        return;
-      }
-      const hasCompleted = afterSaved || localStorage.getItem(VISITOR_COMPLETED_KEY) === "1";
-      const rank = hasCompleted ? usageCount : usageCount + 1;
-      setVisitorCounterText(`您是第 ${rank} 位使用此测试的未小羊`);
-    } catch (_) {
-      setVisitorCounterText("您是正在探索此测试的未小羊");
-    }
-  }
-
-<<<<<<< Updated upstream
-=======
-  function setVisitorCounterText(text) {
-    const counterEl = document.getElementById("visitor-counter-text");
-    if (counterEl) counterEl.textContent = text;
-  }
-
-  async function fetchUsageCountFromSupabase() {
-    const base = (RESULT_UPLOAD_CONFIG.supabaseUrl || "").replace(/\/+$/, "");
-    const key = RESULT_UPLOAD_CONFIG.supabaseAnonKey || "";
-    const table = RESULT_UPLOAD_CONFIG.tableName || "wyti_results";
-    if (!base || !key) return null;
-    const tablePath = encodeURIComponent(table);
-    const url = `${base}/rest/v1/${tablePath}?select=id&limit=1`;
+    const rpcName = RESULT_UPLOAD_CONFIG.countRpcName || "get_wyti_results_count";
+    const useCountRpc = RESULT_UPLOAD_CONFIG.useCountRpc !== false;
+    const url = useCountRpc
+      ? `${base}/rest/v1/rpc/${encodeURIComponent(rpcName)}`
+      : `${base}/rest/v1/${tablePath}?select=id&limit=1`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        "apikey": key,
-        "Authorization": `Bearer ${key}`,
-        "Prefer": "count=exact"
-      },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+    let res;
+    try {
+      res = await fetch(url, {
+        method: useCountRpc ? "POST" : "GET",
+        headers: {
+          "apikey": key,
+          "Authorization": `Bearer ${key}`,
+          "Prefer": "count=exact",
+          "Content-Type": "application/json"
+        },
+        signal: controller.signal,
+        body: useCountRpc ? "{}" : undefined
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!res.ok) return null;
+
+    // RPC 模式：期待返回 [{"count":123}] 或 {"count":123}
+    if (useCountRpc) {
+      const data = await res.json().catch(() => null);
+      const rawCount = Array.isArray(data) ? data[0]?.count : data?.count;
+      const total = Number(rawCount);
+      return Number.isFinite(total) ? total : null;
+    }
+
+    // 旧模式：依赖 content-range 头
     const contentRange = res.headers.get("content-range") || "";
     const totalPart = contentRange.split("/")[1];
     const total = Number(totalPart);
@@ -586,7 +554,6 @@
     }
   }
 
->>>>>>> Stashed changes
   function switchPage(fromId, toId) {
     document.getElementById(fromId).classList.remove("active");
     document.getElementById(toId).classList.add("active");
@@ -1314,25 +1281,54 @@
 
   // ==================== DOM 初始化 ====================
   document.addEventListener("DOMContentLoaded", function() {
-    resetTest();
-    refreshVisitorCounter(false);
-    document.getElementById("start-button").addEventListener("click", () => {
-      switchPage("welcome-page", "question-page"); window.showQuestion(0);
-    });
-    document.getElementById("prev-button").addEventListener("click", window.showPreviousQuestion);
-    document.getElementById("next-button").addEventListener("click", () => {
-      if (userAnswers[currentQuestionIndex] === null) {
-        const container = document.getElementById("options-container");
-        container.style.animation = "none"; container.offsetHeight;
-        container.style.animation = "shake 0.4s ease-in-out"; return;
+    try {
+      resetTest();
+      const startBtn = document.getElementById("start-button");
+      const prevBtn = document.getElementById("prev-button");
+      const nextBtn = document.getElementById("next-button");
+      const restartBtn = document.getElementById("restart-button");
+      const shareImageBtn = document.getElementById("share-image-button");
+      const shareBtn = document.getElementById("share-button");
+
+      if (startBtn) {
+        startBtn.addEventListener("click", () => {
+          switchPage("welcome-page", "question-page");
+          window.showQuestion(0);
+        });
       }
-      if (window.showNextQuestion()) { switchPage("question-page", "result-page"); window.showResult(); }
-    });
-    document.getElementById("restart-button").addEventListener("click", () => {
-      switchPage("result-page", "welcome-page"); window.resetTest();
-    });
-    document.getElementById("share-image-button").addEventListener("click", window.generateShareImage);
-    document.getElementById("share-button").addEventListener("click", window.shareResults);
+      if (prevBtn) prevBtn.addEventListener("click", window.showPreviousQuestion);
+      if (nextBtn) {
+        nextBtn.addEventListener("click", () => {
+          if (userAnswers[currentQuestionIndex] === null) {
+            const container = document.getElementById("options-container");
+            if (container) {
+              container.style.animation = "none";
+              container.offsetHeight;
+              container.style.animation = "shake 0.4s ease-in-out";
+            }
+            return;
+          }
+          if (window.showNextQuestion()) {
+            switchPage("question-page", "result-page");
+            window.showResult();
+          }
+        });
+      }
+      if (restartBtn) {
+        restartBtn.addEventListener("click", () => {
+          switchPage("result-page", "welcome-page");
+          window.resetTest();
+        });
+      }
+      if (shareImageBtn) shareImageBtn.addEventListener("click", window.generateShareImage);
+      if (shareBtn) shareBtn.addEventListener("click", window.shareResults);
+
+      Promise.resolve(refreshVisitorCounter(false)).catch(() => {
+        setVisitorCounterText("您是正在探索此测试的未小羊");
+      });
+    } catch (err) {
+      console.error("[WYTI Init] 初始化失败", err);
+    }
   });
 
   const shakeStyle = document.createElement("style");
