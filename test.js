@@ -356,9 +356,9 @@
   const IC_SCORE_BOOST = 0.015;
   const RESULT_UPLOAD_CONFIG = {
     enabled: true,
+    supabaseUrl: "https://ftvwvfbufgccufceewnz.supabase.co",
+    supabaseAnonKey: "sb_publishable_8bT1wEYcrksiXmaK2gvO8A_11X8tyHn",
     provider: "supabase", // "supabase" | "custom"
-    supabaseUrl: "https://disboundary.top/WYTI-Test/",
-    supabaseAnonKey: "sb_publishable_MlFz4AlxYIkmCAvCh4NImA_FzUw-K1E",
     tableName: "wyti_results",
     // 推荐开启：通过 Supabase RPC 返回聚合计数，避免开放明细 select
     useCountRpc: true,
